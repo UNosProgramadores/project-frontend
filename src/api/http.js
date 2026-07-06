@@ -34,8 +34,8 @@ http.interceptors.response.use(
         import('@/stores/auth').then(({ useAuthStore }) => {
           const authStore = useAuthStore()
           authStore.logout()
-          // ponytail: router.push('/login') goes here when the router guard layer exists
         })
+        import('@/router').then(mod => mod.default.push({ name: 'login' }))
       }
       return Promise.reject(apiError)
     }

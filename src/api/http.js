@@ -30,7 +30,13 @@ http.interceptors.response.use(
   error => {
     if (error.response) {
       const apiError = normalizeError(error.response.data, error.response.status)
-      // ponytail: redirect to login / logout logic will go here when router + auth store exist
+      if (error.response.status === 401) {
+        import('@/stores/auth').then(({ useAuthStore }) => {
+          const authStore = useAuthStore()
+          authStore.logout()
+          // ponytail: router.push('/login') goes here when the router guard layer exists
+        })
+      }
       return Promise.reject(apiError)
     }
     return Promise.reject({

@@ -120,6 +120,9 @@
           <div><strong>Método de pago:</strong> {{ paymentMethodLabel(exitResult.paymentMethod) }}</div>
           <div><strong>Factura #:</strong> {{ exitResult.invoiceId }}</div>
         </div>
+        <button class="btn invoice-btn" @click="router.push(`/staff/invoices?id=${exitResult.invoiceId}`)">
+          Ver factura
+        </button>
       </div>
     </div>
   </div>
@@ -127,11 +130,13 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getVehicleTypes } from '@/api/vehicleTypes'
 import { getActiveEntries, registerEntry, registerExit } from '@/api/entryRecords'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const parkingLotId = computed(() => authStore.user?.parkingLotId)
 
 const tabs = [
@@ -411,5 +416,14 @@ onMounted(() => {
 }
 .entry-form, .exit-form {
   max-width: 500px;
+}
+.invoice-btn {
+  margin-top: 1rem;
+  padding: 0.5rem 1.5rem;
+  background: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 </style>

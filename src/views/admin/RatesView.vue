@@ -12,16 +12,18 @@
       <thead>
         <tr>
           <th>Tipo vehículo</th>
-          <th>Tarifa por hora</th>
-          <th>Tarifa por día</th>
+          <th>Tipo tarifa</th>
+          <th>Costo</th>
+          <th>Activa</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="rate in rates" :key="rate.id">
-          <td>{{ vehicleTypeLabel(rate.vehicleType) }}</td>
-          <td>${{ rate.hourlyRate }}</td>
-          <td>${{ rate.dailyRate }}</td>
+          <td>{{ vehicleTypeLabel(rate.vehicleType?.name) }}</td>
+          <td>{{ rateTypeLabel(rate.rateType) }}</td>
+          <td>${{ Number(rate.cost).toFixed(2) }}</td>
+          <td>{{ rate.active ? 'Sí' : 'No' }}</td>
           <td>
             <button class="btn edit-btn" @click="openEdit(rate)">Editar</button>
             <button class="btn delete-btn" @click="handleDelete(rate.id)">Eliminar</button>
@@ -36,20 +38,33 @@
         <form @submit.prevent="handleSave">
           <div class="form-group">
             <label>Tipo vehículo</label>
-            <select v-model="form.vehicleTypeId" :disabled="editing" required>
+            <select v-model="form.vehicleTypeId" required>
               <option value="" disabled>Seleccione tipo</option>
               <option v-for="vt in vehicleTypes" :key="vt.id" :value="vt.id">
                 {{ vehicleTypeLabel(vt.name) }}
               </option>
             </select>
+            <span v-if="fieldErrors.vehicleTypeId" class="field-error">{{ fieldErrors.vehicleTypeId }}</span>
           </div>
           <div class="form-group">
-            <label>Tarifa por hora</label>
-            <input v-model.number="form.hourlyRate" type="number" min="0" step="0.01" required />
+            <label>Tipo tarifa</label>
+            <select v-model="form.rateType" required>
+              <option value="" disabled>Seleccione tipo</option>
+              <option value="per_minute">Por minuto</option>
+              <option value="flat">Tarifa plena</option>
+            </select>
+            <span v-if="fieldErrors.rateType" class="field-error">{{ fieldErrors.rateType }}</span>
           </div>
           <div class="form-group">
-            <label>Tarifa por día</label>
-            <input v-model.number="form.dailyRate" type="number" min="0" step="0.01" required />
+            <label>Costo</label>
+            <input v-model.number="form.cost" type="number" min="0" step="0.01" required />
+            <span v-if="fieldErrors.cost" class="field-error">{{ fieldErrors.cost }}</span>
+          </div>
+          <div class="form-group">
+            <label>
+              <input v-model="form.active" type="checkbox" />
+              Activa
+            </label>
           </div>
           <div v-if="formError" class="error-msg">{{ formError }}</div>
           <div class="modal-actions">
@@ -82,12 +97,17 @@ const editing = ref(false)
 const saving = ref(false)
 const formError = ref(null)
 const editId = ref(null)
+const fieldErrors = ref({})
 
-const form = reactive({ vehicleTypeId: '', hourlyRate: 0, dailyRate: 0 })
+const form = reactive({ vehicleTypeId: '', rateType: '', cost: 0, active: true })
 
 function vehicleTypeLabel(name) {
   const map = { car: 'Carro', motorcycle: 'Moto', bicycle: 'Bicicleta' }
   return map[name] || name
+}
+
+function rateTypeLabel(type) {
+  return type === 'per_minute' ? 'Por minuto' : type === 'flat' ? 'Tarifa plena' : type
 }
 
 async function fetchRates() {
@@ -117,19 +137,23 @@ function openCreate() {
   editing.value = false
   editId.value = null
   form.vehicleTypeId = ''
-  form.hourlyRate = 0
-  form.dailyRate = 0
+  form.rateType = ''
+  form.cost = 0
+  form.active = true
   formError.value = null
+  fieldErrors.value = {}
   showForm.value = true
 }
 
 function openEdit(rate) {
   editing.value = true
   editId.value = rate.id
-  form.vehicleTypeId = rate.vehicleTypeId || ''
-  form.hourlyRate = rate.hourlyRate
-  form.dailyRate = rate.dailyRate
+  form.vehicleTypeId = rate.vehicleType?.id || ''
+  form.rateType = rate.rateType || ''
+  form.cost = rate.cost || 0
+  form.active = rate.active !== false
   formError.value = null
+  fieldErrors.value = {}
   showForm.value = true
 }
 
@@ -139,6 +163,7 @@ function closeForm() {
 
 async function handleSave() {
   formError.value = null
+  fieldErrors.value = {}
   saving.value = true
   try {
     if (editing.value) {
@@ -150,6 +175,11 @@ async function handleSave() {
     await fetchRates()
   } catch (e) {
     formError.value = e.message || 'Error al guardar tarifa'
+    if (e.fieldErrors?.length) {
+      const map = {}
+      e.fieldErrors.forEach(fe => { map[fe.field] = fe.message })
+      fieldErrors.value = map
+    }
   } finally {
     saving.value = false
   }
@@ -172,111 +202,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.rates-view {
-  padding: 1rem;
-}
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-h2 {
-  margin: 0;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.data-table th, .data-table td {
-  border: 1px solid #ddd;
-  padding: 0.5rem;
-  text-align: left;
-}
-.data-table th {
-  background: #f0f0f0;
-}
-.status-msg {
-  color: #666;
-  font-style: italic;
-}
-.error-msg {
-  color: #e74c3c;
-  margin-bottom: 0.5rem;
-}
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-.modal {
-  background: #fff;
-  padding: 1.5rem;
-  border-radius: 8px;
-  min-width: 400px;
-  max-width: 500px;
-}
-.modal h3 {
-  margin-top: 0;
-}
-.form-group {
-  margin-bottom: 1rem;
-}
-.form-group label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-weight: 600;
-}
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-.modal-actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-}
-.btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-.add-btn {
-  background: #42b883;
-  color: #fff;
-}
-.edit-btn {
-  background: #3498db;
-  color: #fff;
-  font-size: 0.85rem;
-  padding: 0.25rem 0.75rem;
-  margin-right: 0.25rem;
-}
-.delete-btn {
-  background: #e74c3c;
-  color: #fff;
-  font-size: 0.85rem;
-  padding: 0.25rem 0.75rem;
-}
-.submit-btn {
-  background: #42b883;
-  color: #fff;
-}
-.submit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.cancel-btn {
-  background: #95a5a6;
-  color: #fff;
-}
+.rates-view { padding: 1rem; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+h2 { margin: 0; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+.data-table th { background: #f0f0f0; }
+.status-msg { color: #666; font-style: italic; }
+.error-msg { color: #e74c3c; margin-bottom: 0.5rem; }
+.field-error { color: #e74c3c; font-size: 0.8rem; display: block; margin-top: 0.25rem; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: #fff; padding: 1.5rem; border-radius: 8px; min-width: 400px; max-width: 500px; }
+.modal h3 { margin-top: 0; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
+.form-group input, .form-group select { width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.form-group input[type="checkbox"] { width: auto; margin-right: 0.5rem; }
+.modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
+.add-btn { background: #42b883; color: #fff; }
+.edit-btn { background: #3498db; color: #fff; font-size: 0.85rem; padding: 0.25rem 0.75rem; margin-right: 0.25rem; }
+.delete-btn { background: #e74c3c; color: #fff; font-size: 0.85rem; padding: 0.25rem 0.75rem; }
+.submit-btn { background: #42b883; color: #fff; }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.cancel-btn { background: #95a5a6; color: #fff; }
 </style>

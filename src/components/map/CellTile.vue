@@ -3,7 +3,8 @@ import { computed } from 'vue'
 
 const props = defineProps({
   cell: { type: Object, default: null },
-  editable: { type: Boolean, default: false }
+  editable: { type: Boolean, default: false },
+  selectable: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['cell-click'])
@@ -36,11 +37,12 @@ const colors = computed(() => {
       cell.cellType === 'transit' ? 'transit' : 'parking',
       cell.status === 'occupied' ? 'occupied' : '',
       cell.reservedForStaff ? 'staff' : '',
-      editable ? 'editable' : ''
+      editable || selectable ? 'clickable' : '',
+      selectable ? 'selectable' : ''
     ]"
     :style="cell.cellType !== 'transit' ? { background: colors.bg, color: colors.text } : {}"
     :title="`${cell.code}${cell.reservedForStaff ? ' (staff)' : ''}`"
-    @click="editable && emit('cell-click', cell)"
+    @click="(editable || selectable) && emit('cell-click', cell)"
   >
     <span class="icon">{{ cell.status === 'occupied' ? (icons[cell.vehicleTypeName] || '') : (cell.vehicleTypeName || '—') }}</span>
     <span class="code" :style="cell.cellType !== 'transit' ? { color: colors.text } : {}">{{ cell.code }}</span>
@@ -82,11 +84,17 @@ const colors = computed(() => {
   border-width: 2px;
   border-color: #f57f17;
 }
-.cell.editable {
+.cell.clickable {
   cursor: pointer;
 }
-.cell.editable:hover {
+.cell.clickable:hover {
   box-shadow: 0 0 0 2px #3498db;
+}
+.cell.selectable {
+  box-shadow: 0 0 0 2px #27ae60;
+}
+.cell.selectable:hover {
+  box-shadow: 0 0 0 3px #1e8449;
 }
 .code {
   font-weight: 600;

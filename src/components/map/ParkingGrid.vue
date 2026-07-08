@@ -5,7 +5,8 @@ defineProps({
   rows: { type: Number, required: true },
   columns: { type: Number, required: true },
   grid: { type: Array, required: true },
-  editable: { type: Boolean, default: false }
+  editable: { type: Boolean, default: false },
+  selectableIds: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['cell-click'])
@@ -25,6 +26,7 @@ const emit = defineEmits(['cell-click'])
         :key="`${rIdx}-${cIdx}`"
         :cell="cell"
         :editable="editable"
+        :selectable="selectableIds.includes(cell?.id)"
         @cell-click="emit('cell-click', $event)"
       />
     </template>

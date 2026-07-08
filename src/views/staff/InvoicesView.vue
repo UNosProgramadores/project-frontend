@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getInvoices, getInvoiceById } from '@/api/invoices'
@@ -122,6 +122,16 @@ function goBackToList() {
   invoiceDetail.value = null
   router.push('/staff/invoices')
 }
+
+watch(() => route.query.id, (id) => {
+  if (id) {
+    invoiceDetail.value = null
+    fetchInvoiceDetail(id)
+  } else {
+    invoiceDetail.value = null
+    fetchInvoices()
+  }
+})
 
 onMounted(() => {
   const invoiceId = route.query.id

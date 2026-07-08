@@ -61,6 +61,28 @@
           />
         </div>
 
+        <div v-if="selectedTypeRequiresPlate !== null" class="form-group">
+          <label for="ownerDoc">Documento del cliente (opcional)</label>
+          <div class="doc-row">
+            <input
+              id="ownerDoc"
+              v-model="entryForm.ownerDocument"
+              placeholder="Cédula del cliente"
+            />
+            <button
+              type="button"
+              class="btn verify-btn"
+              :disabled="!entryForm.ownerDocument.trim() || checkingCustomer"
+              @click="verifyCustomer"
+            >
+              {{ checkingCustomer ? 'Verificando...' : 'Verificar' }}
+            </button>
+          </div>
+          <p class="hint">Si el cliente tiene cuenta registrada, ingresa su documento para asociar el vehículo a su perfil.</p>
+          <p v-if="customerName" class="customer-found">Cliente: {{ customerName }}</p>
+          <p v-if="customerNotFound" class="customer-not-found">Cliente no encontrado</p>
+        </div>
+
         <div v-if="error.entrySubmit" class="error-msg">{{ error.entrySubmit }}</div>
         <div v-if="entryFieldErrors.length" class="field-errors">
           <p v-for="fe in entryFieldErrors" :key="fe.field" class="field-error">{{ fe.message }}</p>
@@ -134,6 +156,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getVehicleTypes } from '@/api/vehicleTypes'
 import { getActiveEntries, registerEntry, registerExit } from '@/api/entryRecords'
+import { searchCustomerByDocument } from '@/api/customers'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -151,13 +174,16 @@ const vehicleTypes = ref([])
 const entrySuccess = ref(false)
 const entrySuccessCell = ref(null)
 const exitResult = ref(null)
+const customerName = ref(null)
+const customerNotFound = ref(false)
+const checkingCustomer = ref(false)
 
 const loading = reactive({ entries: false, entryTypes: false, entrySubmit: false, exitSubmit: false })
 const error = reactive({ entries: null, entrySubmit: null, exitSubmit: null })
 const entryFieldErrors = ref([])
 const exitFieldErrors = ref([])
 
-const entryForm = reactive({ vehicleTypeId: '', plate: '', bikeRegistration: '' })
+const entryForm = reactive({ vehicleTypeId: '', plate: '', bikeRegistration: '', ownerDocument: '' })
 const exitForm = reactive({ identifier: '', paymentMethod: '' })
 
 const paymentMethods = [
@@ -181,6 +207,22 @@ function formatDateTime(dt) {
   return new Date(dt).toLocaleString()
 }
 
+async function verifyCustomer() {
+  const doc = entryForm.ownerDocument?.trim()
+  if (!doc) return
+  checkingCustomer.value = true
+  customerName.value = null
+  customerNotFound.value = false
+  try {
+    const res = await searchCustomerByDocument(doc)
+    customerName.value = res.data.name
+  } catch {
+    customerNotFound.value = true
+  } finally {
+    checkingCustomer.value = false
+  }
+}
+
 const selectedTypeRequiresPlate = computed(() => {
   if (!entryForm.vehicleTypeId) return null
   const vt = vehicleTypes.value.find(t => t.id === entryForm.vehicleTypeId)
@@ -195,6 +237,9 @@ watch(activeTab, (tab) => {
 watch(entryForm.vehicleTypeId, () => {
   entryForm.plate = ''
   entryForm.bikeRegistration = ''
+  entryForm.ownerDocument = ''
+  customerName.value = null
+  customerNotFound.value = false
 })
 
 async function fetchActiveEntries() {
@@ -246,6 +291,9 @@ async function handleEntry() {
   } else {
     payload.bikeRegistration = entryForm.bikeRegistration
   }
+  if (entryForm.ownerDocument?.trim()) {
+    payload.ownerDocument = entryForm.ownerDocument.trim()
+  }
 
   try {
     const res = await registerEntry(parkingLotId.value, payload)
@@ -254,6 +302,9 @@ async function handleEntry() {
     entryForm.vehicleTypeId = ''
     entryForm.plate = ''
     entryForm.bikeRegistration = ''
+    entryForm.ownerDocument = ''
+    customerName.value = null
+    customerNotFound.value = false
     fetchActiveEntries()
   } catch (e) {
     if (e.fieldErrors && e.fieldErrors.length) {
@@ -416,6 +467,42 @@ onMounted(() => {
 }
 .entry-form, .exit-form {
   max-width: 500px;
+}
+.doc-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.doc-row input {
+  flex: 1;
+}
+.verify-btn {
+  padding: 0.5rem 1rem;
+  background: #3498db;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.verify-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.hint {
+  color: #666;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+.customer-found {
+  color: #27ae60;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+.customer-not-found {
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
 }
 .invoice-btn {
   margin-top: 1rem;

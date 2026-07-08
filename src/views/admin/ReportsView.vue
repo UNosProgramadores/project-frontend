@@ -4,16 +4,12 @@
 
     <div class="filters">
       <div class="form-group">
-        <label>Período</label>
-        <select v-model="filters.period">
-          <option value="day">Día</option>
-          <option value="week">Semana</option>
-          <option value="month">Mes</option>
-        </select>
+        <label>Fecha inicio</label>
+        <input v-model="filters.startDate" type="date" class="filter-input" />
       </div>
       <div class="form-group">
-        <label>Fecha de referencia</label>
-        <input v-model="filters.date" type="date" />
+        <label>Fecha fin</label>
+        <input v-model="filters.endDate" type="date" class="filter-input" />
       </div>
       <button class="btn filter-btn" @click="fetchReport">Consultar</button>
     </div>
@@ -22,10 +18,7 @@
     <div v-else-if="error" class="error-msg">{{ error }}</div>
     <div v-else-if="report" class="report-content">
       <div class="period-info">
-        Reporte de {{ periodLabel }} — {{ report.referenceDate }}
-        <span v-if="report.startDate && report.endDate">
-          ({{ report.startDate }} al {{ report.endDate }})
-        </span>
+        Reporte del {{ filters.startDate }} al {{ filters.endDate }}
       </div>
 
       <div class="summary-grid">
@@ -75,13 +68,33 @@
           <div v-else class="status-msg">Sin datos</div>
         </div>
       </div>
+
+      <div v-if="report.staffActivity?.length" class="staff-section">
+        <h3>Actividad del personal</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Ingresos registrados</th>
+              <th>Salidas registradas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in report.staffActivity" :key="item.staffId">
+              <td>{{ item.staffName }}</td>
+              <td>{{ item.entriesRecorded }}</td>
+              <td>{{ item.exitsRecorded }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div v-else class="status-msg">Seleccione un período y presione Consultar</div>
+    <div v-else class="status-msg">Seleccione un rango de fechas y presione Consultar</div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getReport } from '@/api/reports'
 
@@ -92,14 +105,10 @@ const report = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
+const today = new Date().toISOString().slice(0, 10)
 const filters = reactive({
-  period: 'day',
-  date: new Date().toISOString().slice(0, 10)
-})
-
-const periodLabel = computed(() => {
-  const map = { day: 'día', week: 'semana', month: 'mes' }
-  return map[filters.period] || filters.period
+  startDate: today,
+  endDate: today
 })
 
 function vehicleTypeLabel(name) {
@@ -108,12 +117,11 @@ function vehicleTypeLabel(name) {
 }
 
 async function fetchReport() {
-  if (!parkingLotId) return
+  if (!parkingLotId || !filters.startDate || !filters.endDate) return
   loading.value = true
   error.value = null
   try {
-    const params = { period: filters.period }
-    if (filters.date) params.date = filters.date
+    const params = { startDate: filters.startDate, endDate: filters.endDate }
     const res = await getReport(parkingLotId, params)
     report.value = res.data
   } catch (e) {
@@ -129,9 +137,28 @@ onMounted(fetchReport)
 <style scoped>
 .reports-view { padding: 1rem; }
 h2 { margin-bottom: 1rem; }
-.filters { display: flex; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; }
-.form-group label { display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.85rem; }
-.form-group input, .form-group select { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+h3 { margin-bottom: 0.5rem; font-size: 1rem; }
+.filters {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.form-group label { display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.85rem; color: var(--color-text-muted); }
+.filter-input {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
 .filter-btn { padding: 0.5rem 1.5rem; background: #42b883; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 .period-info { margin-bottom: 1rem; font-style: italic; color: #555; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
@@ -140,11 +167,11 @@ h2 { margin-bottom: 1rem; }
 .card-label { font-size: 0.85rem; color: #666; margin-top: 0.25rem; }
 .breakdown-section { display: flex; gap: 2rem; flex-wrap: wrap; }
 .breakdown { flex: 1; min-width: 250px; }
-.breakdown h3 { margin-bottom: 0.5rem; font-size: 1rem; }
+.staff-section { margin-top: 2rem; }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { border: 1px solid #ddd; padding: 0.4rem 0.5rem; text-align: left; }
 .data-table th { background: #f0f0f0; }
 .status-msg { color: #666; font-style: italic; }
-.error-msg { color: #e74c3c; margin-bottom: 0.5rem; }
+.error-msg { color: #e74c3c; margin-bottom: 0.5rem; padding: 0.5rem; background: #fdecea; border-radius: 4px; }
 .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; }
 </style>

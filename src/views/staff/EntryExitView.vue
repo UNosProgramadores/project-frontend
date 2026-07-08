@@ -1,5 +1,18 @@
 <template>
   <div class="entry-exit-view">
+    <div class="auto-assignment-bar">
+      <label class="toggle-label">
+        <input
+          type="checkbox"
+          :checked="autoAssignment"
+          :disabled="!isAdmin"
+          @change="toggleAutoAssignment"
+        />
+        <span>Asignación automática de celdas</span>
+      </label>
+      <span v-if="!isAdmin" class="toggle-hint">Solo administrador puede cambiar</span>
+    </div>
+
     <div class="tabs">
       <button
         v-for="tab in tabs"
@@ -40,62 +53,87 @@
     </div>
 
     <div v-if="activeTab === 'entry'" class="tab-content">
-      <div v-if="loading.entryTypes" class="status-msg">Cargando tipos de vehículo...</div>
-      <form v-else @submit.prevent="handleEntry" class="entry-form">
-        <div class="form-group">
-          <label>Tipo de vehículo</label>
-          <select v-model="entryForm.vehicleTypeId" required>
-            <option value="" disabled>Seleccione tipo</option>
-            <option v-for="vt in vehicleTypes" :key="vt.id" :value="vt.id">
-              {{ vehicleTypeLabel(vt.name) }}
-            </option>
-          </select>
-        </div>
-
-        <div v-if="selectedTypeRequiresPlate !== null" class="form-group">
-          <label>{{ selectedTypeRequiresPlate ? 'Placa' : 'Registro de bicicleta' }}</label>
-          <input
-            v-model="entryForm[selectedTypeRequiresPlate ? 'plate' : 'bikeRegistration']"
-            :placeholder="selectedTypeRequiresPlate ? 'ABC-123' : 'Bike-001'"
-            required
+      <div class="entry-layout">
+        <div class="map-section">
+          <h3>Mapa del parqueadero</h3>
+          <div v-if="loadingMap" class="status-msg">Cargando mapa...</div>
+          <div v-else-if="mapError" class="error-msg">{{ mapError }}</div>
+          <ParkingGrid
+            v-else-if="parkingLotMap"
+            :rows="parkingLotMap.rows"
+            :columns="parkingLotMap.columns"
+            :grid="parkingLotMap.grid"
+            :selectable-ids="selectableCellIds"
+            @cell-click="onCellClick"
           />
-        </div>
-
-        <div v-if="selectedTypeRequiresPlate !== null" class="form-group">
-          <label for="ownerDoc">Documento del cliente (opcional)</label>
-          <div class="doc-row">
-            <input
-              id="ownerDoc"
-              v-model="entryForm.ownerDocument"
-              placeholder="Cédula del cliente"
-            />
-            <button
-              type="button"
-              class="btn verify-btn"
-              :disabled="!entryForm.ownerDocument.trim() || checkingCustomer"
-              @click="verifyCustomer"
-            >
-              {{ checkingCustomer ? 'Verificando...' : 'Verificar' }}
-            </button>
+          <div v-if="isManualMode && selectedCell" class="selected-cell-info">
+            Celda seleccionada: <strong>{{ selectedCell.code }}</strong>
+            <button class="btn deselect-btn" @click="selectedCell = null">X</button>
           </div>
-          <p class="hint">Si el cliente tiene cuenta registrada, ingresa su documento para asociar el vehículo a su perfil.</p>
-          <p v-if="customerName" class="customer-found">Cliente: {{ customerName }}</p>
-          <p v-if="customerNotFound" class="customer-not-found">Cliente no encontrado</p>
+          <div v-if="isManualMode && !selectedCell" class="select-cell-hint">
+            Seleccione una celda disponible en el mapa
+          </div>
         </div>
 
-        <div v-if="error.entrySubmit" class="error-msg">{{ error.entrySubmit }}</div>
-        <div v-if="entryFieldErrors.length" class="field-errors">
-          <p v-for="fe in entryFieldErrors" :key="fe.field" class="field-error">{{ fe.message }}</p>
+        <div class="form-section">
+          <div v-if="loading.entryTypes" class="status-msg">Cargando tipos de vehículo...</div>
+          <form v-else @submit.prevent="handleEntry" class="entry-form">
+            <div class="form-group">
+              <label>Tipo de vehículo</label>
+              <select v-model="entryForm.vehicleTypeId" required>
+                <option value="" disabled>Seleccione tipo</option>
+                <option v-for="vt in vehicleTypes" :key="vt.id" :value="vt.id">
+                  {{ vehicleTypeLabel(vt.name) }}
+                </option>
+              </select>
+            </div>
+
+            <div v-if="selectedTypeRequiresPlate !== null" class="form-group">
+              <label>{{ selectedTypeRequiresPlate ? 'Placa' : 'Registro de bicicleta' }}</label>
+              <input
+                v-model="entryForm[selectedTypeRequiresPlate ? 'plate' : 'bikeRegistration']"
+                :placeholder="selectedTypeRequiresPlate ? 'ABC-123' : 'Bike-001'"
+                required
+              />
+            </div>
+
+            <div v-if="selectedTypeRequiresPlate !== null" class="form-group">
+              <label for="ownerDoc">Documento del cliente (opcional)</label>
+              <div class="doc-row">
+                <input
+                  id="ownerDoc"
+                  v-model="entryForm.ownerDocument"
+                  placeholder="Cédula del cliente"
+                />
+                <button
+                  type="button"
+                  class="btn verify-btn"
+                  :disabled="!entryForm.ownerDocument.trim() || checkingCustomer"
+                  @click="verifyCustomer"
+                >
+                  {{ checkingCustomer ? 'Verificando...' : 'Verificar' }}
+                </button>
+              </div>
+              <p class="hint">Si el cliente tiene cuenta registrada, ingresa su documento para asociar el vehículo a su perfil.</p>
+              <p v-if="customerName" class="customer-found">Cliente: {{ customerName }}</p>
+              <p v-if="customerNotFound" class="customer-not-found">Cliente no encontrado</p>
+            </div>
+
+            <div v-if="error.entrySubmit" class="error-msg">{{ error.entrySubmit }}</div>
+            <div v-if="entryFieldErrors.length" class="field-errors">
+              <p v-for="fe in entryFieldErrors" :key="fe.field" class="field-error">{{ fe.message }}</p>
+            </div>
+
+            <button type="submit" class="btn submit-btn" :disabled="loading.entrySubmit || (isManualMode && !selectedCell)">
+              {{ loading.entrySubmit ? 'Registrando...' : 'Registrar ingreso' }}
+            </button>
+          </form>
+
+          <div v-if="entrySuccess" class="success-msg">
+            Ingreso registrado con éxito.
+            <span v-if="entrySuccessCell">Celda asignada: {{ entrySuccessCell }}</span>
+          </div>
         </div>
-
-        <button type="submit" class="btn submit-btn" :disabled="loading.entrySubmit">
-          {{ loading.entrySubmit ? 'Registrando...' : 'Registrar ingreso' }}
-        </button>
-      </form>
-
-      <div v-if="entrySuccess" class="success-msg">
-        Ingreso registrado con éxito.
-        <span v-if="entrySuccessCell">Celda asignada: {{ entrySuccessCell }}</span>
       </div>
     </div>
 
@@ -157,10 +195,14 @@ import { useAuthStore } from '@/stores/auth'
 import { getVehicleTypes } from '@/api/vehicleTypes'
 import { getActiveEntries, registerEntry, registerExit } from '@/api/entryRecords'
 import { searchCustomerByDocument } from '@/api/customers'
+import { getParkingLot, updateParkingLot } from '@/api/config'
+import { getParkingLotMap } from '@/api/parkingLots'
+import ParkingGrid from '@/components/map/ParkingGrid.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const parkingLotId = computed(() => authStore.user?.parkingLotId)
+const isAdmin = computed(() => authStore.role === 'admin')
 
 const tabs = [
   { key: 'inside', label: 'Vehículos dentro' },
@@ -191,6 +233,29 @@ const paymentMethods = [
   { value: 'CARD', label: 'Tarjeta' },
   { value: 'TRANSFER', label: 'Transferencia' }
 ]
+
+const parkingLot = ref(null)
+const parkingLotMap = ref(null)
+const loadingMap = ref(false)
+const mapError = ref(null)
+const selectedCell = ref(null)
+const togglingAuto = ref(false)
+
+const autoAssignment = computed(() => parkingLot.value?.autoAssignment ?? false)
+const isManualMode = computed(() => !autoAssignment.value)
+
+const selectableCellIds = computed(() => {
+  if (!isManualMode.value || !entryForm.vehicleTypeId || !parkingLotMap.value) return []
+  const ids = []
+  for (const row of parkingLotMap.value.grid) {
+    for (const cell of row) {
+      if (cell && cell.status === 'available' && cell.cellType === 'parking' && cell.vehicleTypeId === entryForm.vehicleTypeId) {
+        ids.push(cell.id)
+      }
+    }
+  }
+  return ids
+})
 
 function vehicleTypeLabel(name) {
   const map = { car: 'Carro', motorcycle: 'Moto', bicycle: 'Bicicleta' }
@@ -231,7 +296,11 @@ const selectedTypeRequiresPlate = computed(() => {
 
 watch(activeTab, (tab) => {
   if (tab === 'inside') fetchActiveEntries()
-  if (tab === 'entry') { entrySuccess.value = false; entrySuccessCell.value = null }
+  if (tab === 'entry') {
+    entrySuccess.value = false
+    entrySuccessCell.value = null
+    fetchMap()
+  }
 })
 
 watch(entryForm.vehicleTypeId, () => {
@@ -240,7 +309,69 @@ watch(entryForm.vehicleTypeId, () => {
   entryForm.ownerDocument = ''
   customerName.value = null
   customerNotFound.value = false
+  if (selectedCell.value && !selectableCellIds.value.includes(selectedCell.value.id)) {
+    selectedCell.value = null
+  }
 })
+
+async function fetchParkingLot() {
+  if (!parkingLotId.value) return
+  try {
+    const res = await getParkingLot(parkingLotId.value)
+    parkingLot.value = res.data
+  } catch (e) {
+    console.error('Error al cargar parqueadero', e)
+  }
+}
+
+async function fetchMap() {
+  if (!parkingLotId.value) return
+  loadingMap.value = true
+  mapError.value = null
+  try {
+    const res = await getParkingLotMap(parkingLotId.value)
+    parkingLotMap.value = res.data
+  } catch (e) {
+    mapError.value = e.message || 'Error al cargar mapa'
+  } finally {
+    loadingMap.value = false
+  }
+}
+
+async function toggleAutoAssignment(e) {
+  if (!isAdmin.value || !parkingLot.value) return
+  const newVal = e.target.checked
+  const prevVal = autoAssignment.value
+  togglingAuto.value = true
+
+  parkingLot.value.autoAssignment = newVal
+  selectedCell.value = null
+
+  try {
+    const pl = parkingLot.value
+    await updateParkingLot(parkingLotId.value, {
+      name: pl.name,
+      address: pl.address,
+      openingTime: pl.openingTime,
+      closingTime: pl.closingTime,
+      rows: pl.rows,
+      columns: pl.columns,
+      autoAssignment: newVal,
+      discountsEnabled: pl.discountsEnabled ?? false
+    })
+  } catch (e) {
+    parkingLot.value.autoAssignment = prevVal
+    console.error('Error al cambiar asignación automática', e)
+  } finally {
+    togglingAuto.value = false
+  }
+}
+
+function onCellClick(cell) {
+  if (!isManualMode.value) return
+  if (!selectableCellIds.value.includes(cell.id)) return
+  selectedCell.value = cell
+}
 
 async function fetchActiveEntries() {
   if (!parkingLotId.value) return
@@ -283,6 +414,12 @@ async function handleEntry() {
   entrySuccess.value = false
   entrySuccessCell.value = null
   error.entrySubmit = null
+
+  if (isManualMode.value && !selectedCell.value) {
+    entryFieldErrors.value = [{ field: 'cell', message: 'Debe seleccionar una celda disponible en el mapa' }]
+    return
+  }
+
   loading.entrySubmit = true
 
   const payload = { parkingLotId: parkingLotId.value, vehicleTypeId: entryForm.vehicleTypeId }
@@ -293,6 +430,9 @@ async function handleEntry() {
   }
   if (entryForm.ownerDocument?.trim()) {
     payload.ownerDocument = entryForm.ownerDocument.trim()
+  }
+  if (isManualMode.value && selectedCell.value) {
+    payload.cellId = selectedCell.value.id
   }
 
   try {
@@ -305,7 +445,9 @@ async function handleEntry() {
     entryForm.ownerDocument = ''
     customerName.value = null
     customerNotFound.value = false
+    selectedCell.value = null
     fetchActiveEntries()
+    fetchMap()
   } catch (e) {
     if (e.fieldErrors && e.fieldErrors.length) {
       entryFieldErrors.value = e.fieldErrors
@@ -339,6 +481,7 @@ async function handleExit() {
     exitForm.identifier = ''
     exitForm.paymentMethod = ''
     fetchActiveEntries()
+    fetchMap()
   } catch (e) {
     if (e.fieldErrors && e.fieldErrors.length) {
       exitFieldErrors.value = e.fieldErrors
@@ -351,6 +494,7 @@ async function handleExit() {
 }
 
 onMounted(() => {
+  fetchParkingLot()
   fetchActiveEntries()
   fetchVehicleTypes()
 })
@@ -359,6 +503,32 @@ onMounted(() => {
 <style scoped>
 .entry-exit-view {
   padding: 1rem;
+}
+.auto-assignment-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.toggle-label input:disabled + span {
+  opacity: 0.6;
+}
+.toggle-label input:disabled {
+  cursor: not-allowed;
+}
+.toggle-hint {
+  font-size: 0.8rem;
+  color: #999;
+  font-style: italic;
 }
 .tabs {
   display: flex;
@@ -381,6 +551,25 @@ onMounted(() => {
 }
 .tab-content {
   min-height: 200px;
+}
+.entry-layout {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+.map-section {
+  flex: 1;
+  min-width: 0;
+}
+.map-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+.form-section {
+  flex: 1;
+  min-width: 280px;
+  max-width: 500px;
 }
 .data-table {
   width: 100%;
@@ -512,5 +701,32 @@ onMounted(() => {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+}
+.selected-cell-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #eafaf1;
+  border: 1px solid #27ae60;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.deselect-btn {
+  padding: 0.15rem 0.5rem;
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+.select-cell-hint {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
 }
 </style>

@@ -13,6 +13,7 @@
           <div><strong>Ingreso:</strong> {{ formatDateTime(invoiceDetail.entryTime) }}</div>
           <div><strong>Salida:</strong> {{ formatDateTime(invoiceDetail.exitTime) }}</div>
           <div><strong>Duración:</strong> {{ invoiceDetail.duration }} min</div>
+          <div><strong>Tarifa:</strong> {{ rateTypeLabel(invoiceDetail.rateType) }} (${{ invoiceDetail.rateValue }}) — {{ vehicleTypeLabel(invoiceDetail.vehicleType) }}</div>
           <div><strong>Subtotal:</strong> ${{ invoiceDetail.subtotal }}</div>
           <div><strong>Descuento:</strong> ${{ invoiceDetail.discountAmount }}</div>
           <div><strong>Total pagado:</strong> ${{ invoiceDetail.totalPaid }}</div>
@@ -23,6 +24,39 @@
 
     <div v-else class="list-section">
       <h2>Facturas</h2>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>Fecha inicio</label>
+          <input v-model="filters.startDate" type="date" class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <label>Fecha fin</label>
+          <input v-model="filters.endDate" type="date" class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <label>Método de pago</label>
+          <select v-model="filters.paymentMethod" class="filter-input">
+            <option value="">Todos</option>
+            <option value="CASH">Efectivo</option>
+            <option value="CARD">Tarjeta</option>
+            <option value="TRANSFER">Transferencia</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Total desde</label>
+          <input v-model="filters.minTotal" type="number" min="0" step="0.01" class="filter-input" />
+        </div>
+        <div class="filter-group">
+          <label>Total hasta</label>
+          <input v-model="filters.maxTotal" type="number" min="0" step="0.01" class="filter-input" />
+        </div>
+        <div class="filter-actions">
+          <button class="btn filter-btn" @click="applyFilters">Aplicar</button>
+          <button class="btn clear-btn" @click="clearFilters">Limpiar</button>
+        </div>
+      </div>
+
       <div v-if="loading.list" class="status-msg">Cargando...</div>
       <div v-else-if="error.list" class="error-msg">{{ error.list }}</div>
       <div v-else-if="invoices.length === 0" class="status-msg">No hay facturas registradas</div>
@@ -72,6 +106,9 @@ const invoiceDetail = ref(null)
 const loading = reactive({ list: false, detail: false })
 const error = reactive({ list: null, detail: null })
 
+const filters = reactive({ startDate: '', endDate: '', paymentMethod: '', minTotal: '', maxTotal: '' })
+const appliedFilters = reactive({ startDate: '', endDate: '', paymentMethod: '', minTotal: '', maxTotal: '' })
+
 function vehicleTypeLabel(name) {
   const map = { car: 'Carro', motorcycle: 'Moto', bicycle: 'Bicicleta' }
   return map[name] || name
@@ -82,9 +119,47 @@ function paymentMethodLabel(value) {
   return map[value] || value
 }
 
+function rateTypeLabel(value) {
+  const map = { per_minute: 'Por minuto', flat: 'Tarifa plana' }
+  return map[value] || value
+}
+
 function formatDateTime(dt) {
   if (!dt) return ''
   return new Date(dt).toLocaleString()
+}
+
+function buildFilterParams() {
+  const params = {}
+  if (appliedFilters.startDate) params.startDate = appliedFilters.startDate
+  if (appliedFilters.endDate) params.endDate = appliedFilters.endDate
+  if (appliedFilters.paymentMethod) params.paymentMethod = appliedFilters.paymentMethod
+  if (appliedFilters.minTotal !== '' && appliedFilters.minTotal !== null) params.minTotal = appliedFilters.minTotal
+  if (appliedFilters.maxTotal !== '' && appliedFilters.maxTotal !== null) params.maxTotal = appliedFilters.maxTotal
+  return params
+}
+
+function applyFilters() {
+  appliedFilters.startDate = filters.startDate
+  appliedFilters.endDate = filters.endDate
+  appliedFilters.paymentMethod = filters.paymentMethod
+  appliedFilters.minTotal = filters.minTotal
+  appliedFilters.maxTotal = filters.maxTotal
+  fetchInvoices()
+}
+
+function clearFilters() {
+  filters.startDate = ''
+  filters.endDate = ''
+  filters.paymentMethod = ''
+  filters.minTotal = ''
+  filters.maxTotal = ''
+  appliedFilters.startDate = ''
+  appliedFilters.endDate = ''
+  appliedFilters.paymentMethod = ''
+  appliedFilters.minTotal = ''
+  appliedFilters.maxTotal = ''
+  fetchInvoices()
 }
 
 async function fetchInvoices() {
@@ -92,7 +167,7 @@ async function fetchInvoices() {
   loading.list = true
   error.list = null
   try {
-    const res = await getInvoices(parkingLotId)
+    const res = await getInvoices(parkingLotId, buildFilterParams())
     invoices.value = res.data
   } catch (e) {
     error.list = e.message || 'Error al cargar facturas'
@@ -149,6 +224,67 @@ onMounted(() => {
 }
 h2 {
   margin-bottom: 1rem;
+}
+.filter-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.filter-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.filter-input {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  min-width: 130px;
+}
+.filter-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.filter-btn {
+  padding: 0.45rem 1rem;
+  background: var(--color-primary-700);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.filter-btn:hover {
+  background: var(--color-primary-600);
+}
+.clear-btn {
+  padding: 0.45rem 1rem;
+  background: #95a5a6;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.clear-btn:hover {
+  background: #7f8c8d;
 }
 .data-table {
   width: 100%;

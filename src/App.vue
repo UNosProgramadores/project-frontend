@@ -19,6 +19,9 @@ const authStore = useAuthStore()
 <style>
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
 }
 .app-layout {
   display: flex;

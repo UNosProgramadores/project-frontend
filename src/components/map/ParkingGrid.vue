@@ -4,8 +4,11 @@ import CellTile from './CellTile.vue'
 defineProps({
   rows: { type: Number, required: true },
   columns: { type: Number, required: true },
-  grid: { type: Array, required: true }
+  grid: { type: Array, required: true },
+  editable: { type: Boolean, default: false }
 })
+
+const emit = defineEmits(['cell-click'])
 </script>
 
 <template>
@@ -21,6 +24,8 @@ defineProps({
         v-for="(cell, cIdx) in row"
         :key="`${rIdx}-${cIdx}`"
         :cell="cell"
+        :editable="editable"
+        @cell-click="emit('cell-click', $event)"
       />
     </template>
   </div>

@@ -35,12 +35,12 @@
     <form @submit.prevent="handleClaim" class="claim-form">
       <div class="form-group">
         <label>Placa</label>
-        <input v-model="form.plate" placeholder="ABC-123" />
+        <input v-model="form.plate" placeholder="ABC123" />
       </div>
 
       <div class="form-group">
         <label>Registro de bicicleta</label>
-        <input v-model="form.bikeRegistration" placeholder="Bike-001" />
+        <input v-model="form.bikeRegistration" placeholder="AABBCCD" />
       </div>
 
       <p class="hint-sm">Ingresa la placa o el registro de bicicleta (al menos uno).</p>

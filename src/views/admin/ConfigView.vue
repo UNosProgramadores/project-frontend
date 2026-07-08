@@ -41,18 +41,7 @@
         <input v-model="form.closingTime" type="time" required />
         <span v-if="fieldErrors.closingTime" class="field-error">{{ fieldErrors.closingTime }}</span>
       </div>
-      <div class="form-group">
-        <label>
-          <input v-model="form.autoAssignment" type="checkbox" />
-          Asignación automática de celdas
-        </label>
-      </div>
-      <div class="form-group">
-        <label>
-          <input v-model="form.discountsEnabled" type="checkbox" />
-          Descuentos habilitados
-        </label>
-      </div>
+
       <div v-if="saveError" class="error-msg">{{ saveError }}</div>
       <div v-if="saveSuccess" class="success-msg">Configuración guardada exitosamente</div>
       <button type="submit" class="btn submit-btn" :disabled="saving">
@@ -63,20 +52,39 @@
     <!-- TAB 2: MAPA -->
     <div v-else-if="activeTab === 'map' && !error" class="map-tab">
       <div class="map-controls">
-        <div class="size-controls">
-          <div class="form-group">
-            <label>Filas</label>
-            <input v-model.number="form.rows" type="number" min="1" max="100" required />
+        <div class="top-controls">
+          <div class="size-controls">
+            <div class="form-group">
+              <label>Filas</label>
+              <input v-model.number="form.rows" type="number" min="1" max="100" required />
+            </div>
+            <div class="form-group">
+              <label>Columnas</label>
+              <input v-model.number="form.columns" type="number" min="1" max="100" required />
+            </div>
+            <button class="btn action-btn" :disabled="resizing" @click="handleResize">
+              {{ resizing ? 'Redimensionando...' : 'Redimensionar' }}
+            </button>
           </div>
-          <div class="form-group">
-            <label>Columnas</label>
-            <input v-model.number="form.columns" type="number" min="1" max="100" required />
+          <div v-if="selectedCellIds.length" class="batch-inline">
+            <span class="batch-count">{{ selectedCellIds.length }} celda(s)</span>
+            <select v-model="batchCellType" class="batch-select">
+              <option value="parking">Parqueo</option>
+              <option value="transit">Tránsito</option>
+            </select>
+            <select v-if="batchCellType === 'parking'" v-model="batchVehicleTypeId" class="batch-select">
+              <option value="" disabled>Tipo vehículo</option>
+              <option v-for="vt in vehicleTypes" :key="vt.id" :value="vt.id">{{ vtLabel(vt.name) }}</option>
+            </select>
+            <button class="btn batch-btn" :disabled="batchSaving || (batchCellType === 'parking' && !batchVehicleTypeId)" @click="applyBatch">
+              {{ batchSaving ? 'Aplicando...' : 'Aplicar' }}
+            </button>
+            <button class="btn batch-btn cancel" @click="clearSelection">Limpiar</button>
           </div>
-          <button class="btn action-btn" :disabled="resizing" @click="handleResize">
-            {{ resizing ? 'Redimensionando...' : 'Redimensionar' }}
-          </button>
         </div>
         <div v-if="resizeMsg" class="success-msg">{{ resizeMsg }}</div>
+        <div v-if="resizeError" class="error-msg">{{ resizeError }}</div>
+        <div v-if="mapError" class="error-msg">{{ mapError }}</div>
         <div class="grid-section">
           <div v-if="mapLoading" class="status-msg">Cargando mapa...</div>
           <ParkingGrid
@@ -85,7 +93,8 @@
             :columns="mapData.columns"
             :grid="mapData.grid"
             :editable="true"
-            @cell-click="openCellEditor"
+            :selectable-ids="selectedCellIds"
+            @cell-click="toggleCellSelection"
           />
         </div>
       </div>
@@ -101,50 +110,12 @@
 
     <div v-else-if="error" class="error-msg">{{ error }}</div>
 
-    <!-- MODAL EDITAR CELDA -->
-    <div v-if="editingCell" class="modal-overlay" @click.self="closeCellEditor">
-      <div class="modal">
-        <h3>Celda {{ editingCell.code }}</h3>
-        <p class="cell-status-info">
-          Estado: <strong>{{ editingCell.status === 'occupied' ? 'Ocupada' : 'Disponible' }}</strong>
-          <span v-if="editingCell.status === 'occupied'"> — El vehículo permanecerá en la celda</span>
-        </p>
 
-        <div class="form-group">
-          <label>Tipo de celda</label>
-          <select v-model="editCellType">
-            <option value="parking">Parqueo</option>
-            <option value="transit">Tránsito</option>
-          </select>
-        </div>
-
-        <div v-if="editCellType === 'parking'" class="form-group">
-          <label>Tipo de vehículo</label>
-          <select v-model="editVehicleTypeId" :required="editCellType === 'parking'">
-            <option value="" disabled>Seleccione tipo</option>
-            <option
-              v-for="vt in vehicleTypes"
-              :key="vt.id"
-              :value="vt.id"
-            >{{ vtLabel(vt.name) }}</option>
-          </select>
-        </div>
-
-        <div v-if="cellSaveError" class="error-msg">{{ cellSaveError }}</div>
-
-        <div class="modal-actions">
-          <button class="btn cancel-btn" @click="closeCellEditor">Cancelar</button>
-          <button class="btn submit-btn" :disabled="cellSaving" @click="saveCell">
-            {{ cellSaving ? 'Guardando...' : 'Guardar' }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getParkingLot, updateParkingLot, deleteParkingLot } from '@/api/config'
@@ -171,17 +142,26 @@ const fieldErrors = ref({})
 // Map tab state
 const mapData = reactive({ rows: 1, columns: 1, grid: [] })
 const mapLoading = ref(false)
+const mapError = ref(null)
 const resizing = ref(false)
 const resizeMsg = ref('')
+const resizeError = ref(null)
 const deleting = ref(false)
 
-// Cell editor state
-const editingCell = ref(null)
-const editCellType = ref('parking')
-const editVehicleTypeId = ref(null)
-const cellSaving = ref(false)
-const cellSaveError = ref(null)
+// Batch cell editor state
+const selectedCellIds = ref([])
+const batchCellType = ref('parking')
+const batchVehicleTypeId = ref('')
+const batchSaving = ref(false)
 const vehicleTypes = ref([])
+
+const timers = ref([])
+
+function flash(ref, value, ms = 5000) {
+  ref.value = value
+  const t = setTimeout(() => { ref.value = value === true ? false : '' }, ms)
+  timers.value.push(t)
+}
 
 const vtLabels = { car: 'Carro', motorcycle: 'Moto', bicycle: 'Bicicleta' }
 const vtLabel = (name) => vtLabels[name] || name
@@ -224,7 +204,7 @@ async function fetchMap() {
     mapData.columns = res.data.columns
     mapData.grid = res.data.grid
   } catch (e) {
-    error.value = e.message || 'Error al cargar el mapa'
+    flash(mapError, e.message || 'Error al cargar el mapa')
   } finally {
     mapLoading.value = false
   }
@@ -261,11 +241,11 @@ async function handleResize() {
     })
     originalSize.rows = form.rows
     originalSize.columns = form.columns
-    resizeMsg.value = 'Tamaño actualizado'
+    flash(resizeMsg, 'Tamaño actualizado')
     await fetchMap()
   } catch (e) {
     resizeMsg.value = ''
-    error.value = e.message || 'Error al redimensionar'
+    flash(resizeError, e.message || 'Error al redimensionar')
   } finally {
     resizing.value = false
   }
@@ -280,9 +260,9 @@ async function handleSave() {
     await updateParkingLot(parkingLotId, { ...form })
     originalSize.rows = form.rows
     originalSize.columns = form.columns
-    saveSuccess.value = true
+    flash(saveSuccess, true)
   } catch (e) {
-    saveError.value = e.message || 'Error al guardar configuración'
+    flash(saveError, e.message || 'Error al guardar configuración')
     if (e.fieldErrors?.length) {
       const map = {}
       e.fieldErrors.forEach(fe => { map[fe.field] = fe.message })
@@ -306,50 +286,49 @@ async function handleDelete() {
   }
 }
 
-function openCellEditor(cell) {
-  editingCell.value = cell
-  editCellType.value = cell.cellType
-  editVehicleTypeId.value = cell.vehicleTypeId ?? ''
-  cellSaveError.value = null
-}
-
-function closeCellEditor() {
-  editingCell.value = null
-}
-
-async function saveCell() {
-  if (!editingCell.value) return
-  cellSaveError.value = null
-  if (editCellType.value === 'parking' && !editVehicleTypeId.value) {
-    cellSaveError.value = 'Debe seleccionar un tipo de vehículo'
-    return
+function toggleCellSelection(cell) {
+  const idx = selectedCellIds.value.indexOf(cell.id)
+  if (idx >= 0) {
+    selectedCellIds.value.splice(idx, 1)
+  } else {
+    selectedCellIds.value.push(cell.id)
   }
-  cellSaving.value = true
-  try {
-    const cell = editingCell.value
-    const typeChanged = editCellType.value !== cell.cellType
-    const vtChanged = editVehicleTypeId.value !== cell.vehicleTypeId
+}
 
-    if (typeChanged) {
-      await updateCellType(parkingLotId, cell.id, editCellType.value)
-    }
-    if (!typeChanged || editCellType.value === 'parking') {
-      if (vtChanged) {
-        await updateCellVehicleType(parkingLotId, cell.id, editVehicleTypeId.value)
+function clearSelection() {
+  selectedCellIds.value = []
+}
+
+async function applyBatch() {
+  if (!selectedCellIds.value.length) return
+  batchSaving.value = true
+  try {
+    for (const cellId of selectedCellIds.value) {
+      const cell = mapData.grid.flat().find(c => c && c.id === cellId)
+      if (!cell) continue
+      if (batchCellType.value !== cell.cellType) {
+        await updateCellType(parkingLotId, cellId, batchCellType.value)
+      }
+      if (batchCellType.value === 'parking' && batchVehicleTypeId.value && batchVehicleTypeId.value !== cell.vehicleTypeId) {
+        await updateCellVehicleType(parkingLotId, cellId, batchVehicleTypeId.value)
       }
     }
-    closeCellEditor()
+    clearSelection()
     await fetchMap()
   } catch (e) {
-    cellSaveError.value = e.message || 'Error al guardar cambios de la celda'
+    alert('Error al aplicar cambios: ' + (e.message || 'desconocido'))
   } finally {
-    cellSaving.value = false
+    batchSaving.value = false
   }
 }
 
 onMounted(() => {
   fetchConfig()
   fetchVehicleTypes()
+})
+
+onUnmounted(() => {
+  timers.value.forEach(clearTimeout)
 })
 </script>
 
@@ -426,41 +405,47 @@ onMounted(() => {
 }
 .danger-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
+/* Top controls row */
+.top-controls {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
 }
-.modal {
-  background: #fff;
-  border-radius: 8px;
-  padding: 1.5rem;
-  min-width: 320px;
-  max-width: 400px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-.modal h3 { margin-bottom: 0.5rem; }
-.cell-status-info { font-size: 0.85rem; color: #555; margin-bottom: 1rem; }
-.modal .form-group { margin-bottom: 1rem; }
-.modal .form-group label { display: block; margin-bottom: 0.25rem; font-weight: 600; }
-.modal .form-group select {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-.modal-actions {
+.batch-inline {
   display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
 }
+.batch-count {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-primary-700);
+  white-space: nowrap;
+}
+.batch-select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+.batch-btn {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.85rem;
+  background: var(--color-primary-700);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.batch-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.batch-btn.cancel {
+  background: #95a5a6;
+}
+.batch-btn.cancel:hover { background: #7f8c8d; }
 .cancel-btn {
   padding: 0.5rem 1.5rem;
   background: #95a5a6;
@@ -477,6 +462,7 @@ onMounted(() => {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  margin-top: 0.5rem;
 }
 .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -486,6 +472,6 @@ onMounted(() => {
 .form-group input[type="time"] { width: auto; }
 .field-error { color: #e74c3c; font-size: 0.8rem; display: block; margin-top: 0.25rem; }
 .status-msg { color: #666; font-style: italic; }
-.error-msg { color: #e74c3c; margin-bottom: 0.5rem; }
+.error-msg { color: #e74c3c; margin-bottom: 0.5rem; padding: 0.5rem; background: #fdecea; border-radius: 4px; }
 .success-msg { color: #27ae60; margin-bottom: 0.5rem; padding: 0.5rem; background: #eafaf1; border-radius: 4px; }
 </style>

@@ -32,27 +32,23 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <form @submit.prevent="handleSubmit">
+  <form class="auth-card" @submit.prevent="handleSubmit">
     <h2>Iniciar sesión</h2>
 
-    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="form-alert form-alert--error">{{ errorMessage }}</p>
 
-    <label>
-      Usuario
-      <input v-model="username" type="text" required />
-    </label>
+    <div class="field">
+      <label for="login-username">Usuario</label>
+      <input id="login-username" v-model="username" type="text" class="form-input" required />
+    </div>
 
-    <label>
-      Contraseña
-      <input v-model="password" type="password" required />
-    </label>
+    <div class="field">
+      <label for="login-password">Contraseña</label>
+      <input id="login-password" v-model="password" type="password" class="form-input" required />
+    </div>
 
-    <button type="submit" :disabled="loading">
+    <button type="submit" class="btn btn-primary btn-block" :disabled="loading">
       {{ loading ? 'Entrando...' : 'Entrar' }}
     </button>
   </form>
 </template>
-
-<style scoped>
-.error { color: red; }
-</style>

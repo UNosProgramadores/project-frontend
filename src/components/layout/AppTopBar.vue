@@ -1,6 +1,7 @@
 <script setup>
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import logoIcon from '@/assets/logo-icon.png'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -16,7 +17,7 @@ function handleLogout() {
 <template>
   <header class="topbar">
     <router-link to="/" class="topbar-brand">
-      <span class="topbar-logo">P</span>
+      <img :src="logoIcon" alt="ParKing" class="topbar-logo" />
       <span class="topbar-title">ParKing</span>
     </router-link>
 
@@ -40,15 +41,15 @@ function handleLogout() {
   top: 0;
   left: 0;
   right: 0;
-  height: 56px;
+  height: var(--topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 1.25rem;
-  background: #1a1a2e;
-  color: #eee;
+  background: var(--color-primary-950);
+  color: var(--color-text-inverse);
   z-index: 1000;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .topbar-brand {
@@ -56,20 +57,13 @@ function handleLogout() {
   align-items: center;
   gap: 0.6rem;
   text-decoration: none;
-  color: #eee;
+  color: var(--color-text-inverse);
 }
 
 .topbar-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #e94560;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1.1rem;
+  height: 34px;
+  width: auto;
+  display: block;
 }
 
 .topbar-title {
@@ -85,11 +79,11 @@ function handleLogout() {
 }
 
 .topbar-link {
-  color: #ccc;
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
   font-size: 0.9rem;
   padding: 0.35rem 0.75rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: none;
   background: none;
   cursor: pointer;
@@ -98,37 +92,38 @@ function handleLogout() {
 
 .topbar-link:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  color: var(--color-text-inverse);
 }
 
 .topbar-link--primary {
-  background: #e94560;
-  color: #fff;
+  background: var(--color-accent-500);
+  color: var(--color-primary-950);
 }
 
 .topbar-link--primary:hover {
-  background: #d63851;
+  background: var(--color-accent-600);
 }
 
 .topbar-link--logout {
-  color: #f4878c;
+  color: #ffb4a8;
 }
 
 .topbar-link--logout:hover {
-  background: rgba(233, 69, 96, 0.15);
-  color: #f4878c;
+  background: rgba(224, 71, 58, 0.18);
+  color: #ffb4a8;
 }
 
 .topbar-user {
   font-weight: 500;
   font-size: 0.9rem;
+  color: var(--color-text-inverse);
 }
 
 .topbar-role {
   display: inline-block;
   font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.12);
-  color: #ccc;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-text-inverse);
   padding: 0.15rem 0.5rem;
   border-radius: 10px;
   font-weight: 500;

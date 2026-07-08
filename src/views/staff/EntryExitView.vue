@@ -1,18 +1,5 @@
 <template>
   <div class="entry-exit-view">
-    <div class="auto-assignment-bar">
-      <label class="toggle-label">
-        <input
-          type="checkbox"
-          :checked="autoAssignment"
-          :disabled="!isAdmin"
-          @change="toggleAutoAssignment"
-        />
-        <span>Asignación automática de celdas</span>
-      </label>
-      <span v-if="!isAdmin" class="toggle-hint">Solo administrador puede cambiar</span>
-    </div>
-
     <div class="tabs">
       <button
         v-for="tab in tabs"
@@ -92,7 +79,7 @@
               <label>{{ selectedTypeRequiresPlate ? 'Placa' : 'Registro de bicicleta' }}</label>
               <input
                 v-model="entryForm[selectedTypeRequiresPlate ? 'plate' : 'bikeRegistration']"
-                :placeholder="selectedTypeRequiresPlate ? 'ABC-123' : 'Bike-001'"
+                :placeholder="selectedTypeRequiresPlate ? 'ABC123' : 'AABBCCD'"
                 required
               />
             </div>
@@ -122,6 +109,19 @@
             <div v-if="error.entrySubmit" class="error-msg">{{ error.entrySubmit }}</div>
             <div v-if="entryFieldErrors.length" class="field-errors">
               <p v-for="fe in entryFieldErrors" :key="fe.field" class="field-error">{{ fe.message }}</p>
+            </div>
+
+            <div class="auto-assignment-bar">
+              <label class="toggle-label">
+                <input
+                  type="checkbox"
+                  :checked="autoAssignment"
+                  :disabled="!isAdmin"
+                  @change="toggleAutoAssignment"
+                />
+                <span>Asignación automática de celdas</span>
+              </label>
+              <span v-if="!isAdmin" class="toggle-hint">Solo administrador puede cambiar</span>
             </div>
 
             <button type="submit" class="btn submit-btn" :disabled="loading.entrySubmit || (isManualMode && !selectedCell)">
@@ -510,7 +510,6 @@ onMounted(() => {
   gap: 0.75rem;
   padding: 0.5rem 0;
   margin-bottom: 0.5rem;
-  border-bottom: 1px solid #e0e0e0;
 }
 .toggle-label {
   display: flex;

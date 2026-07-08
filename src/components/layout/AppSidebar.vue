@@ -50,10 +50,13 @@ const links = computed(() => {
 
 <style scoped>
 .sidebar {
-  width: 220px;
-  min-width: 220px;
-  background: #16213e;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--color-primary-900);
   border-right: 1px solid rgba(255, 255, 255, 0.06);
+  position: sticky;
+  top: var(--topbar-height);
+  height: calc(100vh - var(--topbar-height));
 }
 
 .sidebar-nav {
@@ -65,7 +68,7 @@ const links = computed(() => {
 .sidebar-link {
   display: block;
   padding: 0.7rem 1.25rem;
-  color: #ccc;
+  color: rgba(255, 255, 255, 0.75);
   text-decoration: none;
   font-size: 0.9rem;
   border-left: 3px solid transparent;
@@ -73,14 +76,14 @@ const links = computed(() => {
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-inverse);
 }
 
 .sidebar-link.router-link-active {
-  background: rgba(233, 69, 96, 0.12);
-  border-left-color: #e94560;
-  color: #fff;
+  background: rgba(28, 110, 164, 0.25);
+  border-left-color: var(--color-primary-700);
+  color: var(--color-text-inverse);
   font-weight: 500;
 }
 </style>

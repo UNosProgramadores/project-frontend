@@ -38,6 +38,6 @@ const emit = defineEmits(['cell-click'])
   display: grid;
   gap: 3px;
   max-width: 600px;
-  margin: 0 auto;
+  margin: 0;
 }
 </style>

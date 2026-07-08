@@ -7,30 +7,54 @@
 
     <div v-if="loading" class="status-msg">Cargando...</div>
     <div v-else-if="error" class="error-msg">{{ error }}</div>
-    <div v-else-if="rates.length === 0" class="status-msg">No hay tarifas configuradas</div>
-    <table v-else class="data-table">
-      <thead>
-        <tr>
-          <th>Tipo vehículo</th>
-          <th>Tipo tarifa</th>
-          <th>Costo</th>
-          <th>Activa</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="rate in rates" :key="rate.id">
-          <td>{{ vehicleTypeLabel(rate.vehicleType?.name) }}</td>
-          <td>{{ rateTypeLabel(rate.rateType) }}</td>
-          <td>${{ Number(rate.cost).toFixed(2) }}</td>
-          <td>{{ rate.active ? 'Sí' : 'No' }}</td>
-          <td>
-            <button class="btn edit-btn" @click="openEdit(rate)">Editar</button>
-            <button class="btn delete-btn" @click="handleDelete(rate.id)">Eliminar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-else>
+      <h3 class="section-title">Tarifas activas</h3>
+      <table v-if="activeRates.length" class="data-table">
+        <thead>
+          <tr>
+            <th>Tipo vehículo</th>
+            <th>Tipo tarifa</th>
+            <th>Costo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="rate in activeRates" :key="rate.id">
+            <td>{{ vehicleTypeLabel(rate.vehicleType?.name) }}</td>
+            <td>{{ rateTypeLabel(rate.rateType) }}</td>
+            <td>${{ Number(rate.cost).toFixed(2) }}</td>
+            <td>
+              <button class="btn edit-btn" @click="openEdit(rate)">Editar</button>
+              <button class="btn delete-btn" @click="handleDelete(rate.id)">Eliminar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="status-msg">No hay tarifas activas</div>
+
+      <h3 class="section-title" style="margin-top: 2rem;">Tarifas inactivas</h3>
+      <table v-if="inactiveRates.length" class="data-table">
+        <thead>
+          <tr>
+            <th>Tipo vehículo</th>
+            <th>Tipo tarifa</th>
+            <th>Costo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="rate in inactiveRates" :key="rate.id">
+            <td>{{ vehicleTypeLabel(rate.vehicleType?.name) }}</td>
+            <td>{{ rateTypeLabel(rate.rateType) }}</td>
+            <td>${{ Number(rate.cost).toFixed(2) }}</td>
+            <td>
+              <button class="btn delete-btn" @click="handleDelete(rate.id)">Eliminar</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div v-else class="status-msg">No hay tarifas inactivas</div>
+    </div>
 
     <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
       <div class="modal">
@@ -80,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getVehicleTypes } from '@/api/vehicleTypes'
 import { getRates, createRate, updateRate, deleteRate } from '@/api/rates'
@@ -100,6 +124,17 @@ const editId = ref(null)
 const fieldErrors = ref({})
 
 const form = reactive({ vehicleTypeId: '', rateType: '', cost: 0, active: true })
+
+const activeRates = computed(() => rates.value.filter(r => r.active))
+const inactiveRates = computed(() => {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - 30)
+  return rates.value.filter(r => {
+    if (r.active) return false
+    if (!r.endDate) return false
+    return new Date(r.endDate) >= cutoff
+  })
+})
 
 function vehicleTypeLabel(name) {
   const map = { car: 'Carro', motorcycle: 'Moto', bicycle: 'Bicicleta' }
@@ -205,6 +240,7 @@ onMounted(() => {
 .rates-view { padding: 1rem; }
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 h2 { margin: 0; }
+.section-title { font-size: 1rem; margin-bottom: 0.5rem; color: var(--color-text-muted, #555); }
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table th, .data-table td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
 .data-table th { background: #f0f0f0; }

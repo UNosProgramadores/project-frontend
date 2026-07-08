@@ -2,8 +2,11 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  cell: { type: Object, default: null }
+  cell: { type: Object, default: null },
+  editable: { type: Boolean, default: false }
 })
+
+const emit = defineEmits(['cell-click'])
 
 const icons = { car: '🚗', motorcycle: '🏍️', bicycle: '🚲' }
 
@@ -32,10 +35,12 @@ const colors = computed(() => {
     :class="[
       cell.cellType === 'transit' ? 'transit' : 'parking',
       cell.status === 'occupied' ? 'occupied' : '',
-      cell.reservedForStaff ? 'staff' : ''
+      cell.reservedForStaff ? 'staff' : '',
+      editable ? 'editable' : ''
     ]"
     :style="cell.cellType !== 'transit' ? { background: colors.bg, color: colors.text } : {}"
     :title="`${cell.code}${cell.reservedForStaff ? ' (staff)' : ''}`"
+    @click="editable && emit('cell-click', cell)"
   >
     <span class="icon">{{ cell.status === 'occupied' ? (icons[cell.vehicleTypeName] || '') : (cell.vehicleTypeName || '—') }}</span>
     <span class="code" :style="cell.cellType !== 'transit' ? { color: colors.text } : {}">{{ cell.code }}</span>
@@ -77,16 +82,16 @@ const colors = computed(() => {
   border-width: 2px;
   border-color: #f57f17;
 }
+.cell.editable {
+  cursor: pointer;
+}
+.cell.editable:hover {
+  box-shadow: 0 0 0 2px #3498db;
+}
 .code {
   font-weight: 600;
   font-size: 0.75rem;
   line-height: 1;
-}
-.type-name {
-  font-size: 0.6rem;
-  line-height: 1;
-  text-align: center;
-  opacity: 0.85;
 }
 .staff-badge {
   position: absolute;

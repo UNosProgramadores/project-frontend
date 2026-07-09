@@ -53,14 +53,13 @@ las operaciones del parqueadero.
 
 ## 🛠️ Tecnologías utilizadas
 
-- React
-- TypeScript
+- Vue.js
+- JavaScript
 - Vite
 - HTML5
-- CSS3
-- JavaScript
+- CSS
 - Axios
-- React Router
+- Pinia
 
 ---
 

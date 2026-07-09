@@ -2,18 +2,10 @@
 <h3 align="center">Interfaz Web del Sistema de Gestión para Parqueadero de Vehículos</h3>
 
 <p align="center">
-  <img src="../docs/logoTransparenteProyecto.png" alt="ParKing Logo" width="180"/>
-</p>
-
-<p align="center">
   <b>Universidad Nacional de Colombia – Sede Bogotá</b><br>
   Facultad de Ingeniería<br>
   Departamento de Sistemas e Industrial<br>
   Ingeniería de Software I (2016701)
-</p>
-
-<p align="center">
-  <img src="../docs/logoUniversidadNacional.png" alt="Universidad Nacional" width="180"/>
 </p>
 
 ---
